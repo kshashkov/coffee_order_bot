@@ -294,7 +294,7 @@ def register_name_handler(message):
                     "VALUES ('" + str(name) + "', '"
                     + str(chat_id) + "', 3);")
 
-        msg = bot.reply_to(message, "Спасибо! Теперь введите номер Вашей карты лояльности или нажмите /skip, "
+        msg = bot.reply_to(message, "Спасибо! Теперь введите Ваш номер телефона или нажмите /skip, "
                                     "чтобы пропустить этот шаг.")
         bot.register_next_step_handler(msg, register_loyalty_handler)
 
@@ -310,19 +310,19 @@ def register_loyalty_handler(message):
         if not loyalty == '/skip':
             if loyalty.isdigit():
                 cur.execute("UPDATE users "
-                            "SET loyalty = '" + str(loyalty) + "' "
+                            "SET phone_num = '" + str(loyalty) + "' "
                                                                "WHERE tg_id = '" + str(chat_id) + "';")
             else:
-                msg = bot.reply_to(message, "Неверный номер карты лояльности. Попробуйте ещё раз.")
+                msg = bot.reply_to(message, "Неверный номер телефона. Попробуйте ещё раз.")
                 bot.register_next_step_handler(msg, register_loyalty_handler)
 
-        cur.execute("SELECT name,loyalty FROM users WHERE tg_id = '" + str(chat_id) + "';")
+        cur.execute("SELECT name,phone_num FROM users WHERE tg_id = '" + str(chat_id) + "';")
         res = cur.fetchone()
         markup = types.ReplyKeyboardMarkup(row_width=2, one_time_keyboard=True)
         markup.add('Верно', 'Неверно')
         msg = bot.reply_to(message, "Спасибо! Пожалуйста подтвердите Ваши данные.\n"
                                     "Имя: " + str(res[0]) + "\n"
-                                                            "Карта лояльности: " + str(res[1]),
+                                                            "Номер телефона: " + str(res[1]),
                            reply_markup=markup)
         bot.register_next_step_handler(msg, register_confirmaion_handler)
 
@@ -585,7 +585,7 @@ def start_messaging(message):
     user = get_user_info(chat_id)
     if user is None:
         bot.send_message(chat_id, "Добро пожаловать в бот In-Time Coffee!"
-                                  "\nНажмите /register, чтобы зарегистрироваться и начать пользоваться ботом."
+                                  "\nНажмите /register, чтобы зарегистрироваться и оформить заказ."
                                   "\nНажмите /help, чтобы узнать больше о возможностях бота.")
     else:
         if message.text != "/start":
@@ -600,4 +600,5 @@ def start_messaging(message):
 
 
 if __name__ == '__main__':
+    print("Bot started")
     bot.infinity_polling()
