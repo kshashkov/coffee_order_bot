@@ -129,6 +129,8 @@ def show_barista_orders(barista):
                     "Статус: " + str(order.status) + "\n"
         msg_text += order_dsc
         if order.status == "Принят":
+            markup.add("Взять в работу заказ №" + str(order.db_id))
+        elif order.status == "В работе":
             markup.add("Пометить готовым заказ №" + str(order.db_id))
         elif order.status == "Готов":
             markup.add("Пометить выданным заказ №" + str(order.db_id))
@@ -183,6 +185,50 @@ def barista_menu_handler(message):
             user_msg = "Заказ №" + str(order_id) + " отменен бариста.\n\nДетали заказа:\n" + order_dsc
             bot.send_message(chat_id, barista_msg)
             bot.send_message(user_tg_id, user_msg)
+            msg = show_barista_orders(barista)
+            bot.register_next_step_handler(msg, barista_menu_handler)
+        elif "работ" in opt:
+            pos = opt.find('№') + 1
+            order_id = opt[pos:]
+            cur.execute("SELECT id,user_id,timestamp,drink,price,status_id,pickup_time FROM orders WHERE "
+                        "id = " + str(order_id) + ";")
+            order_db = cur.fetchone()
+
+            if order_db is None:
+                bot.send_message(barista.tg_id, "Детали заказа не найдены.")
+                msg = launch_menu(barista)
+                return msg
+
+            order = Order(order_db[0], order_db[1], order_db[2], order_db[3], order_db[4], order_db[5], order_db[6])
+
+            if order.status == "Отменен":
+                bot.send_message(barista.tg_id, "Действие невозможно. Заказ уже отменён.")
+                msg = launch_menu(barista)
+                return msg
+
+            elif order.status == "В работе":
+                bot.send_message(barista.tg_id, "Действие невозможно. Заказ уже взят в работу.")
+                msg = launch_menu(barista)
+                return msg
+
+            elif order.status == "Готов":
+                bot.send_message(barista.tg_id, "Действие невозможно. Заказ уже помечен готовым.")
+                msg = launch_menu(barista)
+                return msg
+
+            elif order.status == "Получен":
+                bot.send_message(barista.tg_id, "Действие невозможно. Заказ уже выдан клиенту.")
+                msg = launch_menu(barista)
+                return msg
+
+            cur.execute("UPDATE orders SET status_id = 2 WHERE id = " + str(order_id) + ";")
+            connection.commit()
+            cur.execute("SELECT users.tg_id FROM orders JOIN users ON orders.user_id = users.id "
+                        "WHERE orders.id = " + str(order_id) + ";")
+            user_data = cur.fetchone()
+            user_tg_id = user_data[0]
+            bot.send_message(user_tg_id, "Бариста начал готовить заказ №" + str(order_id) + ".")
+            bot.send_message(chat_id, "Заказ №" + str(order_id) + " взят в работу.")
             msg = show_barista_orders(barista)
             bot.register_next_step_handler(msg, barista_menu_handler)
         elif "готов" in opt:
@@ -451,7 +497,8 @@ def show_active_orders(user):
                     "Цена: " + str(order.price) + "₽\n" \
                     "Статус: " + str(order.status) + "\n"
         msg_text += order_dsc
-        markup.add("Отменить заказ №" + str(order.db_id))
+        if order.status == "Принят":
+            markup.add("Отменить заказ №" + str(order.db_id))
         order_db = cur.fetchone()
     msg = bot.send_message(user.tg_id, msg_text, reply_markup=markup)
     return msg
@@ -482,6 +529,24 @@ def order_list_reply_handler(message):
 
         if order.status == "Отменен":
             bot.send_message(chat_id, "Действие невозможно. Заказ уже отменён.")
+            msg = show_active_orders(user)
+            if "Главное меню" in msg.text:
+                bot.register_next_step_handler(msg, customer_menu_handler)
+            else:
+                bot.register_next_step_handler(msg, order_list_reply_handler)
+            return
+
+        elif order.status == "В работе":
+            bot.send_message(chat_id, "Действие невозможно. Бариста уже готовит Ваш заказ.")
+            msg = show_active_orders(user)
+            if "Главное меню" in msg.text:
+                bot.register_next_step_handler(msg, customer_menu_handler)
+            else:
+                bot.register_next_step_handler(msg, order_list_reply_handler)
+            return
+
+        elif order.status == "Готов":
+            bot.send_message(chat_id, "Действие невозможно. Заказ уже готов к выдаче.")
             msg = show_active_orders(user)
             if "Главное меню" in msg.text:
                 bot.register_next_step_handler(msg, customer_menu_handler)
